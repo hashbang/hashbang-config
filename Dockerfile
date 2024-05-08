@@ -1,4 +1,4 @@
-FROM debian:bullseye as build
+FROM debian:bookworm as build
 
 RUN apt update && apt install -y git golang ca-certificates
 

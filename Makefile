@@ -81,7 +81,7 @@ initdb:
 
 .PHONY: docker-logs
 docker-logs:
-	scripts/docker-logs $(NAMESPACE) userdb-postgres userdb-postgrest
+	test/scripts/docker-logs $(NAMESPACE) userdb-postgres userdb-postgrest
 
 .PHONY: docker-build
 docker-build:

@@ -96,8 +96,8 @@ func createForm(
 func editForm(
 	logger *log.Logger,
 	hosts []string,
-    user User,
-    sshPublicKeys []SshPublicKey,
+	user User,
+	sshPublicKeys []SshPublicKey,
 ) {
 	app := tview.NewApplication()
 	logo := tview.NewTextView()
@@ -105,7 +105,7 @@ func editForm(
 	logo.SetText(logoText)
 	title := tview.NewTextView()
 	title.SetTextAlign(1)
-    title.SetText(fmt.Sprintf("Editing User: \"%s\"",user.Name))
+	title.SetText(fmt.Sprintf("Editing User: \"%s\"", user.Name))
 	frame := tview.NewFrame(func() tview.Primitive {
 		form := tview.NewForm()
 		form.SetLabelColor(tcell.ColorWhite)
@@ -121,20 +121,20 @@ func editForm(
 		form.AddInputField("Shell",
 			user.Shell, 33, tview.InputFieldMaxLength(800), nil,
 		)
-        keyNum := len(sshPublicKeys)
-        for i:=0; i < len(sshPublicKeys); i++{
-            key := sshPublicKeys[i]
-            keyString := fmt.Sprintf("%s %s",key.Type, key.Key)
-		    form.AddInputField(fmt.Sprintf("Public Key %d",i+1),
-		    	keyString, 33, tview.InputFieldMaxLength(800), nil,
-		    )
-        }
-		form.AddButton("Add Key", func(){
-            keyNum = keyNum + 1
-		    form.AddInputField(fmt.Sprintf("Public Key %d",keyNum),
-		    	"", 33, tview.InputFieldMaxLength(800), nil,
-		    )
-        })
+		keyNum := len(sshPublicKeys)
+		for i := 0; i < len(sshPublicKeys); i++ {
+			key := sshPublicKeys[i]
+			keyString := fmt.Sprintf("%s %s", key.Type, key.Key)
+			form.AddInputField(fmt.Sprintf("Public Key %d", i+1),
+				keyString, 33, tview.InputFieldMaxLength(800), nil,
+			)
+		}
+		form.AddButton("Add Key", func() {
+			keyNum = keyNum + 1
+			form.AddInputField(fmt.Sprintf("Public Key %d", keyNum),
+				"", 33, tview.InputFieldMaxLength(800), nil,
+			)
+		})
 		form.AddButton("Update", func() {
 			//server_dropdown := form.GetFormItem(0).(*tview.DropDown)
 			//_, server := server_dropdown.GetCurrentOption()
@@ -147,8 +147,8 @@ func editForm(
 					"\nError: Account update failed\n",
 					fmt.Errorf("\n%v\n", err),
 				)
-                //TODO: update User and sshPublicKeys structs based on input
-			    fmt.Fprintln(os.Stdout,"\nUser: ",user, sshPublicKeys)
+				//TODO: update User and sshPublicKeys structs based on input
+				fmt.Fprintln(os.Stdout, "\nUser: ", user, sshPublicKeys)
 				os.Exit(1)
 			}
 			app.Stop()

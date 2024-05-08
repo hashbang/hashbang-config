@@ -1,30 +1,34 @@
 package main
 
 import (
-	"encoding/json"
-	"crypto/sha512"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rsa"
+	"crypto/sha512"
 	"encoding/binary"
-	"math/rand"
+	"encoding/json"
 	"fmt"
-	"github.com/creack/pty"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/time/rate"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
-	"regexp"
+
+	"github.com/creack/pty"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/time/rate"
 )
 
 var limiter = NewIPRateLimiter(rate.Every(time.Minute), 10)
 
 var (
-	hostPrivateKeySigner ssh.Signer
+	hostPrivateKeySigners []ssh.Signer
 )
 
 type LoginData struct {
@@ -39,6 +43,7 @@ func handleConnection(nConn net.Conn, sshConfig *ssh.ServerConfig) {
 	addr, _ := conn.Conn.RemoteAddr().(*net.TCPAddr)
 	ipAddress := addr.IP.String()
 	sshKey := "none"
+
 	if conn.Permissions != nil {
 		if conn.Permissions.Extensions != nil {
 			if k, ok := conn.Permissions.Extensions["pubkey"]; ok {
@@ -93,22 +98,22 @@ func handleConnection(nConn net.Conn, sshConfig *ssh.ServerConfig) {
 						command := re.ReplaceAllString(string(req.Payload), "")
 						log.Println("[server] <-", string(jsonLoginData))
 						switch command {
-							case "debug":
-								channel.Write([]byte(fmt.Sprintf(
-									"%s\n\r",jsonLoginData,
-								)))
-								channel.SendRequest(
-									"exit-status", false, []byte{0, 0, 0, 0},
-								)
-								channel.Close()
-								return
-							default:
-								channel.Write([]byte(fmt.Sprintf(
-									"\n\rUnknown command: \"%s\"\n\n\r",
-									command,
-								)))
-								channel.Close()
-								return
+						case "debug":
+							channel.Write([]byte(fmt.Sprintf(
+								"%s\n\r", jsonLoginData,
+							)))
+							channel.SendRequest(
+								"exit-status", false, []byte{0, 0, 0, 0},
+							)
+							channel.Close()
+							return
+						default:
+							channel.Write([]byte(fmt.Sprintf(
+								"\n\rUnknown command: \"%s\"\n\n\r",
+								command,
+							)))
+							channel.Close()
+							return
 						}
 					case "shell":
 						runDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
@@ -186,21 +191,100 @@ func init() {
 	hash := sha512.New()
 	io.WriteString(hash, os.Getenv("HOST_KEY_SEED"))
 	var seed uint64 = binary.BigEndian.Uint64(hash.Sum(nil)[:8])
-	var reader = NewSyncReader(rand.New(rand.NewSource(int64(seed))))
-	pubKey, privKey, _ := ed25519.GenerateKey(reader)
-	sshPubKey, _ := ssh.NewPublicKey(pubKey)
-	hostPrivateKeySigner, _ = ssh.NewSignerFromKey(privKey)
+
+	keys := make(map[string][]byte, 4)
+
+	{
+		var sshKey ssh.PublicKey
+		var err error
+		var reader = NewSyncReader(rand.New(rand.NewSource(int64(seed))))
+
+		pubKey, privKey, err := ed25519.GenerateKey(reader)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		sshKey, err = ssh.NewPublicKey(pubKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		var signer ssh.Signer
+		signer, err = ssh.NewSignerFromKey(privKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		hostPrivateKeySigners = append(hostPrivateKeySigners, signer)
+
+		keys["ed25519"] = ssh.MarshalAuthorizedKey(sshKey)
+	}
+
+	{
+		var sshKey ssh.PublicKey
+		var err error
+		var reader = NewSyncReader(rand.New(rand.NewSource(int64(seed))))
+
+		privKey, err := rsa.GenerateKey(reader, 4096)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		sshKey, err = ssh.NewPublicKey(&privKey.PublicKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		var signer ssh.Signer
+		signer, err = ssh.NewSignerFromKey(privKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		hostPrivateKeySigners = append(hostPrivateKeySigners, signer)
+
+		keys["rsa"] = ssh.MarshalAuthorizedKey(sshKey)
+	}
+
+	{
+		var sshKey ssh.PublicKey
+		var err error
+		var reader = NewSyncReader(rand.New(rand.NewSource(int64(seed))))
+
+		privKey, err := ecdsa.GenerateKey(elliptic.P256(), reader)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		sshKey, err = ssh.NewPublicKey(&privKey.PublicKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		var signer ssh.Signer
+		signer, err = ssh.NewSignerFromKey(privKey)
+		if err != nil {
+			log.Println("ERROR: ", err)
+		}
+
+		hostPrivateKeySigners = append(hostPrivateKeySigners, signer)
+
+		keys["ecdsa"] = ssh.MarshalAuthorizedKey(sshKey)
+	}
+
 	fmt.Println("SSH Daemon Started")
-	fmt.Printf("Host Key: %s", ssh.MarshalAuthorizedKey(sshPubKey))
+	fmt.Printf("Host Key: \n%s", keys)
 }
 
 func main() {
-
 	sshConfig := &ssh.ServerConfig{
 		KeyboardInteractiveCallback: keyboardInteractiveCallback,
 		PublicKeyCallback:           publicKeyCallback,
 	}
-	sshConfig.AddHostKey(hostPrivateKeySigner)
+
+	for _, signer := range hostPrivateKeySigners {
+		sshConfig.AddHostKey(signer)
+	}
 
 	listener, err := net.Listen("tcp4", ":2222")
 	if err != nil {
@@ -209,10 +293,9 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("!! %s", err)
+			log.Printf("!! %s", err)
 			continue
 		}
 		go handleConnection(conn, sshConfig)
 	}
-
 }
