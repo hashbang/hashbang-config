@@ -2,52 +2,56 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
-	"encoding/base64"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
-    "strings"
 )
 
 type RequestBody struct {
-	Name                string      `json:"name"`
-	Host                string      `json:"host"`
-	Shell               string      `json:"shell"`
-	Keys                []string    `json:"keys"`
+	Name  string   `json:"name"`
+	Host  string   `json:"host"`
+	Shell string   `json:"shell"`
+	Keys  []string `json:"keys"`
 }
 
 type ResponseBody struct {
-	Hint                string      `json:"hint"`
-	Details             string      `json:"details"`
-	Message             string      `json:"message"`
-	Code                string      `json:"code"`
-	Request             RequestBody `json:"request"`
+	Hint    string      `json:"hint"`
+	Details string      `json:"details"`
+	Message string      `json:"message"`
+	Code    string      `json:"code"`
+	Request RequestBody `json:"request"`
 }
 
 type SshPublicKey struct {
-	Fingerprint         string      `json:"fingerprint"`
-    Base64Fingerprint   string      `json:"base64_fingerprint"`
-	Type                string      `json:"type"`
-	Key                 string      `json:"key"`
-	Comment             string      `json:"comment"`
-	Uid                 int         `json:"uid"`
+	Fingerprint       string `json:"fingerprint"`
+	Base64Fingerprint string `json:"base64_fingerprint"`
+	Type              string `json:"type"`
+	Key               string `json:"key"`
+	Comment           string `json:"comment"`
+	Uid               int    `json:"uid"`
 }
 
 type User struct {
-	Uid                 int         `json:"uid"`
-	Name                string      `json:"name"`
-    Host                string      `json:"host"`
-	Type                string      `json:"type"`
-	Key                 string      `json:"key"`
-	Comment             string      `json:"comment"`
-    Shell               string      `json:"shell"`
+	Uid     int    `json:"uid"`
+	Name    string `json:"name"`
+	Host    string `json:"host"`
+	Type    string `json:"type"`
+	Key     string `json:"key"`
+	Comment string `json:"comment"`
+	Shell   string `json:"shell"`
+}
+
+func (u User) String() string {
+	return u.Name
 }
 
 type Host struct {
@@ -70,7 +74,7 @@ func getHosts() ([]string, error) {
 	if err != nil {
 		return hosts, err
 	}
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
 		return hosts, err
@@ -91,17 +95,17 @@ func getKeys(
 	key string,
 ) ([]SshPublicKey, error) {
 	var sshPublicKeys []SshPublicKey
-    keyStripped := strings.Fields(key)[1]
-    keyDecoded, err := base64.StdEncoding.DecodeString(keyStripped)
+	keyStripped := strings.Fields(key)[1]
+	keyDecoded, err := base64.StdEncoding.DecodeString(keyStripped)
 	if err != nil {
 		return sshPublicKeys, err
 	}
-    fingerprint := sha256.Sum256(keyDecoded)
+	fingerprint := sha256.Sum256(keyDecoded)
 	apiUrl := fmt.Sprintf(
-        "%s/ssh_public_key?fingerprint=ilike.%x",
-        os.Getenv("API_URL"),
-        fingerprint,
-    )
+		"%s/ssh_public_key?fingerprint=ilike.%x",
+		os.Getenv("API_URL"),
+		fingerprint,
+	)
 	apiToken := os.Getenv("API_TOKEN")
 	req, _ := http.NewRequest("GET", apiUrl, nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", apiToken))
@@ -111,7 +115,7 @@ func getKeys(
 	if err != nil {
 		return sshPublicKeys, err
 	}
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
 		return sshPublicKeys, err
@@ -119,8 +123,8 @@ func getKeys(
 	err = json.Unmarshal([]byte(body), &sshPublicKeys)
 	if err != nil {
 		return sshPublicKeys, err
-    }
-    return sshPublicKeys, nil
+	}
+	return sshPublicKeys, nil
 }
 
 func getUsersById(
@@ -128,10 +132,10 @@ func getUsersById(
 ) ([]User, error) {
 	var users []User
 	apiUrl := fmt.Sprintf(
-        "%s/passwd?uid=eq.%d",
-        os.Getenv("API_URL"),
-        uid,
-    )
+		"%s/passwd?uid=eq.%d",
+		os.Getenv("API_URL"),
+		uid,
+	)
 	apiToken := os.Getenv("API_TOKEN")
 	req, _ := http.NewRequest("GET", apiUrl, nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", apiToken))
@@ -141,7 +145,7 @@ func getUsersById(
 	if err != nil {
 		return users, err
 	}
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
 		return users, err
@@ -149,8 +153,8 @@ func getUsersById(
 	err = json.Unmarshal([]byte(body), &users)
 	if err != nil {
 		return users, err
-    }
-    return users, nil
+	}
+	return users, nil
 }
 
 func createUser(
@@ -181,7 +185,7 @@ func createUser(
 		logger.Println("[client] ++", string(jsonData))
 		return nil
 	}
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
 		return err
@@ -199,9 +203,9 @@ func createUser(
 
 func editUser(
 	logger *log.Logger,
-    user User,
-	sshPublicKeys []SshPublicKey,
+	user User,
+	_ []SshPublicKey,
 ) error {
-    logger.Println("User: %s",user)
+	logger.Printf("User: %s", user)
 	return errors.New("placeholder")
 }

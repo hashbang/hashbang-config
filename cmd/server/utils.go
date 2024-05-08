@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/binary"
-	"golang.org/x/crypto/ssh"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func setWinsize(fd uintptr, w, h uint32) {
@@ -45,7 +46,8 @@ func publicKeyCallback(
 ) (*ssh.Permissions, error) {
 	return &ssh.Permissions{
 		Extensions: map[string]string{
-			"pubkey": strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))),
+			"pubkey":    strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))),
+			"pubkey-fp": ssh.FingerprintSHA256(key),
 		},
 	}, nil
 }

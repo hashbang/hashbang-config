@@ -1,4 +1,6 @@
 NAMESPACE ?= hashbangctl
+UID ?= $(shell id -u)
+GID ?= $(shell id -g)
 
 .PHONY: build
 build:
@@ -33,8 +35,8 @@ test: docker-build docker-build-test docker-stop docker-start
 		--hostname=$(NAMESPACE)-test \
 		--name $(NAMESPACE)-test \
 		--network=userdb \
-		--env UID=$(shell id -u) \
-		--env GID=$(shell id -g) \
+		--env UID=$(UID) \
+		--env GID=$(GID) \
 		--env CONTAINER=$(NAMESPACE) \
 		--env PGPASSWORD=test_password \
 		--env PGHOST=userdb-postgres \
@@ -52,8 +54,8 @@ test-shell: docker-build docker-build-test docker-stop docker-start
 		--hostname=$(NAMESPACE)-test \
 		--name $(NAMESPACE)-test \
 		--network=userdb \
-		--env UID=$(shell id -u) \
-		--env GID=$(shell id -g) \
+		--env UID=$(UID) \
+		--env GID=$(GID) \
 		--env CONTAINER=$(NAMESPACE) \
 		--env PGPASSWORD=test_password \
 		--env PGHOST=userdb-postgres \
@@ -79,7 +81,7 @@ initdb:
 
 .PHONY: docker-logs
 docker-logs:
-	scripts/docker-logs $(NAMESPACE) userdb-postgres userdb-postgrest
+	test/scripts/docker-logs $(NAMESPACE) userdb-postgres userdb-postgrest
 
 .PHONY: docker-build
 docker-build:

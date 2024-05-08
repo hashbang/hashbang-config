@@ -1,6 +1,9 @@
 #!/bin/bash
 
 setup(){
+	bats_load_library bats-support
+	bats_load_library bats-assert
+
 	echo "Settting up test"
 	psql -c "insert into hosts (name,maxusers) values ('test.hashbang.sh','500');";
 	psql -c "insert into hosts (name,maxusers) values ('test2.hashbang.sh','500');";
